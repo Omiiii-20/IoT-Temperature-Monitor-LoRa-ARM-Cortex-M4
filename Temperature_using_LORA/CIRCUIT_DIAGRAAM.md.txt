@@ -1,0 +1,216 @@
+# Circuit Connections - Temperature Monitoring using LoRa
+
+## System Architecture
+
+```
+[DHT11 Sensor] -----> [LPC4088 + LoRa-TX] ~~~(wireless)~~~ [LoRa-RX + FT232] -----> [Laptop]
+```
+
+---
+
+## Transmitter Unit (Field Device)
+
+### DHT11 Temperature Sensor Connections
+
+```
+DHT11 Pin          LPC4088 Pin
+─────────────────────────────────
+VCC (Pin 1)    →   5V
+Data (Pin 2)   →   P4.0 (GPIO4)
+NC (Pin 3)     →   Not Connected
+GND (Pin 4)    →   GND
+```
+
+**Important:** Add 10kΩ pull-up resistor between Data pin and VCC for stable communication.
+
+---
+
+### LoRa Module Connections (Transmitter Side)
+
+```
+LoRa Module        LPC4088 Board
+─────────────────────────────────
+VCC            →   3.3V (NOT 5V!)
+GND            →   GND
+TX             →   P0.3 (UART0_RX)
+RX             →   P0.2 (UART0_TX)
+NSS/CS         →   3.3V (or GPIO for SPI)
+RST            →   3.3V (or GPIO)
+DIO0           →   Optional (for interrupts)
+```
+
+**Warning:** LoRa modules typically operate at 3.3V. Check your module's datasheet!
+
+---
+
+## Receiver Unit (Base Station)
+
+### LoRa Module Connections (Receiver Side)
+
+```
+LoRa Module        FT232 USB Module
+─────────────────────────────────────
+VCC            →   3.3V Output
+GND            →   GND
+TX             →   RX (Receive)
+RX             →   TX (Transmit)
+```
+
+### FT232 to Computer
+
+```
+FT232 Module       Computer
+───────────────────────────
+Mini/Micro USB →   USB Port
+```
+
+---
+
+## Complete System Diagram (ASCII)
+
+```
+TRANSMITTER SIDE:
+┌─────────────────────────────────────────────────┐
+│                                                 │
+│   DHT11 Sensor                                  │
+│   ┌─────────┐                                   │
+│   │  VCC    │────────┐                          │
+│   │  Data   │───┐    │                          │
+│   │  GND    │─┐ │    │                          │
+│   └─────────┘ │ │    │                          │
+│               │ │    │                          │
+│            ┌──┴─┴────┴─────────────┐            │
+│            │   LPC4088 MCU         │            │
+│            │   ARM Cortex-M4       │            │
+│            │                       │            │
+│            │   P4.0 ← DHT11        │            │
+│            │   P0.2 → UART TX      │────┐       │
+│            │   P0.3 ← UART RX      │←───┤       │
+│            │                       │    │       │
+│            │   5V  3.3V  GND       │    │       │
+│            └───┬───┬────┬──────────┘    │       │
+│                │   │    │                │       │
+│                │   │    │       ┌────────┴─────┐ │
+│                │   │    │       │  LoRa Module │ │
+│                │   │    │       │  (SX1278)    │ │
+│                │   │    │       │              │ │
+│            ┌───┘   └────┴───┐   │  TX  RX  ANT │ │
+│            │  Power Supply   │   └──────────────┘ │
+│            │    5V/3.3V      │         ││         │
+│            └─────────────────┘         ││         │
+│                                        ││         │
+└────────────────────────────────────────┼┼─────────┘
+                                         ││
+                          ~~~~~~~~~~~~~~~┼┼~~~~~~~~~~~~~~~
+                          ~~~ Wireless LoRa Signal ~~~
+                          ~~~~~~~~~~~~~~~┼┼~~~~~~~~~~~~~~~
+                                         ││
+                                         VV
+RECEIVER SIDE:
+┌─────────────────────────────────────────────────┐
+│                                        ││         │
+│                               ┌────────┴┴─────┐  │
+│                               │  LoRa Module  │  │
+│                               │  (SX1278)     │  │
+│                               │               │  │
+│                               │  TX  RX  ANT  │  │
+│                               └───┬───┬───────┘  │
+│                                   │   │          │
+│                          ┌────────┴───┴────────┐ │
+│                          │   FT232 USB-Serial  │ │
+│                          │                     │ │
+│                          │   TX ← LoRa TX      │ │
+│                          │   RX → LoRa RX      │ │
+│                          │   3.3V → LoRa VCC   │ │
+│                          │   GND → LoRa GND    │ │
+│                          │                     │ │
+│                          │   [Mini USB Port]   │ │
+│                          └──────────┬──────────┘ │
+│                                     │            │
+│                                     │ USB Cable  │
+│                                     │            │
+│                          ┌──────────┴──────────┐ │
+│                          │   Laptop/Computer   │ │
+│                          │                     │ │
+│                          │   HyperTerminal     │ │
+│                          │   115200 8N1        │ │
+│                          │                     │ │
+│                          └─────────────────────┘ │
+│                                                   │
+└───────────────────────────────────────────────────┘
+```
+
+---
+
+## Pin Configuration Table
+
+### LPC4088 Pins Used
+
+| Pin | Function | Connected To | Direction |
+|-----|----------|--------------|-----------|
+| P4.0 | GPIO | DHT11 Data | Bidirectional |
+| P0.2 | UART0_TX | LoRa RX | Output |
+| P0.3 | UART0_RX | LoRa TX | Input |
+| 5V | Power | DHT11 VCC | - |
+| 3.3V | Power | LoRa VCC | - |
+| GND | Ground | Common Ground | - |
+
+---
+
+## Power Supply Specifications
+
+### Transmitter Unit:
+- **Input Voltage:** 7-12V DC (via barrel jack or USB)
+- **LPC4088 Logic:** 3.3V (regulated on board)
+- **DHT11 Sensor:** 3.3V - 5V
+- **LoRa Module:** 3.3V (typically 100mA max)
+
+### Receiver Unit:
+- **USB Power:** 5V from laptop USB port
+- **FT232 provides:** 3.3V output for LoRa module
+
+---
+
+## Important Notes
+
+1. **Level Shifting:** If using 5V logic DHT11, ensure LPC4088 pin is 5V tolerant or use level shifter
+
+2. **Pull-up Resistor:** DHT11 data line requires 10kΩ pull-up resistor to VCC
+
+3. **LoRa Antenna:** Always connect antenna before powering LoRa module to prevent damage
+
+4. **Frequency Matching:** Both LoRa modules must be on same frequency (433/868/915 MHz)
+
+5. **Power Consumption:**
+   - LPC4088: ~50mA
+   - DHT11: ~2.5mA
+   - LoRa (TX): ~120mA
+   - LoRa (RX): ~12mA
+
+6. **Range Considerations:**
+   - Indoor: 100-300m
+   - Outdoor (line of sight): 2-5 km
+   - Urban: 500m-2km
+
+---
+
+## Testing Points
+
+Use multimeter to verify:
+- 5V rail: Should be steady 5V
+- 3.3V rail: Should be steady 3.3V
+- DHT11 data pin: Should idle HIGH (~3.3V or 5V)
+- UART pins: Should show activity during transmission (use oscilloscope)
+
+---
+
+## Safety Precautions
+
+⚠️ **Never connect 5V to LoRa VCC** - This will damage the module  
+⚠️ **Check antenna connection** before powering LoRa  
+⚠️ **Use proper power supply** - Insufficient current causes resets  
+⚠️ **Ground all components together** - Prevents data corruption  
+
+---
+
+For detailed PCB layout or schematic diagrams, refer to the `schematics/` folder in this repository.
